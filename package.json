@@ -1,0 +1,28 @@
+{
+  "name": "playwright-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that exposes Playwright browser automation as tools for Claude — enabling AI-driven web testing, autonomous test execution, and live failure analysis.",
+  "main": "dist/server.js",
+  "bin": {
+    "playwright-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build":   "tsc",
+    "start":   "node dist/server.js",
+    "dev":     "ts-node src/server.ts",
+    "install-browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "playwright":                "^1.43.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node":     "^10.9.0",
+    "typescript":  "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "node",
+      "args": ["/absolute/path/to/playwright-mcp/dist/server.js"],
+      "description": "Playwright browser automation — navigate, click, fill, screenshot, assert"
+    }
+  }
+}
