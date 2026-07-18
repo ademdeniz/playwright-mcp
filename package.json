@@ -9,7 +9,9 @@
   "scripts": {
     "build":   "tsc",
     "start":   "node dist/server.js",
+    "start:sse": "node dist/sse.js",
     "dev":     "ts-node src/server.ts",
+    "dev:sse": "ts-node src/sse.ts",
     "install-browsers": "playwright install chromium"
   },
   "dependencies": {

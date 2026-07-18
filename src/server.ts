@@ -12,7 +12,9 @@
  *   assert         — verify page state (title, URL, text, element presence)
  *   close_browser  — close browser and free resources
  *
- * Transport: stdio (compatible with Claude Desktop, Cursor, and any MCP host)
+ * Transports:
+ *   stdio (this file, default) — compatible with Claude Desktop, Cursor, and any MCP host
+ *   SSE   (sse.ts)             — HTTP endpoint for Docker-hosted clients like LibreChat
  */
 
 import { Server }             from '@modelcontextprotocol/sdk/server/index.js';
@@ -42,60 +44,71 @@ const ALL_TOOLS = [
   closeBrowserTool,
 ];
 
-const server = new Server(
-  { name: 'playwright-mcp', version: '1.0.0' },
-  { capabilities: { tools: {} } }
-);
+/**
+ * Build a fully wired MCP Server instance.
+ * Each transport connection gets its own Server; they all share the
+ * singleton browserManager, so the browser session persists across clients.
+ */
+export function createServer(): Server {
+  const server = new Server(
+    { name: 'playwright-mcp', version: '1.0.0' },
+    { capabilities: { tools: {} } }
+  );
 
-// ── List tools ──────────────────────────────────────────────────────────────
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: ALL_TOOLS,
-}));
+  // ── List tools ────────────────────────────────────────────────────────────
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: ALL_TOOLS,
+  }));
 
-// ── Call tools ──────────────────────────────────────────────────────────────
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args = {} } = request.params;
+  // ── Call tools ────────────────────────────────────────────────────────────
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args = {} } = request.params;
 
-  try {
-    let result: unknown;
+    try {
+      let result: unknown;
 
-    switch (name) {
-      case 'navigate':        result = await navigate(args as any);       break;
-      case 'get_page_state':  result = await getPageState(args as any);   break;
-      case 'screenshot':      result = await screenshot(args as any);     break;
-      case 'click':           result = await click(args as any);          break;
-      case 'fill':            result = await fill(args as any);           break;
-      case 'evaluate':        result = await evaluate(args as any);       break;
-      case 'assert':          result = await assert(args as any);         break;
-      case 'close_browser':   result = await closeBrowser();              break;
-      default:
-        return {
-          content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-          isError: true,
-        };
+      switch (name) {
+        case 'navigate':        result = await navigate(args as any);       break;
+        case 'get_page_state':  result = await getPageState(args as any);   break;
+        case 'screenshot':      result = await screenshot(args as any);     break;
+        case 'click':           result = await click(args as any);          break;
+        case 'fill':            result = await fill(args as any);           break;
+        case 'evaluate':        result = await evaluate(args as any);       break;
+        case 'assert':          result = await assert(args as any);         break;
+        case 'close_browser':   result = await closeBrowser();              break;
+        default:
+          return {
+            content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+            isError: true,
+          };
+      }
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: 'text', text: `Tool "${name}" failed: ${message}` }],
+        isError: true,
+      };
     }
+  });
 
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
+  return server;
+}
 
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [{ type: 'text', text: `Tool "${name}" failed: ${message}` }],
-      isError: true,
-    };
-  }
-});
-
-// ── Start ────────────────────────────────────────────────────────────────────
+// ── Start (stdio) ────────────────────────────────────────────────────────────
 async function main() {
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await createServer().connect(transport);
   console.error('[playwright-mcp] Server running on stdio');
 }
 
-main().catch((err) => {
-  console.error('[playwright-mcp] Fatal error:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[playwright-mcp] Fatal error:', err);
+    process.exit(1);
+  });
+}
