@@ -30,9 +30,11 @@ export async function click(args: {
 }) {
   const page = await browserManager.getPage();
 
-  const locator = args.text
-    ? page.getByText(args.text, { exact: false }).first()
-    : page.locator(args.selector!).first();
+  // An explicit CSS selector is the more precise signal — prefer it over
+  // fuzzy text matching when a client supplies both.
+  const locator = args.selector
+    ? page.locator(args.selector).first()
+    : page.getByText(args.text!, { exact: false }).first();
 
   if (args.waitForNavigation) {
     await Promise.all([

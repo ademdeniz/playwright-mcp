@@ -44,14 +44,20 @@ const ALL_TOOLS = [
   closeBrowserTool,
 ];
 
-// All tool calls share one browser/page, so execution is serialized
-// process-wide: if a client sends parallel tool calls, they run in order.
-let toolQueue: Promise<unknown> = Promise.resolve();
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
-  const run = toolQueue.then(task, task);
-  toolQueue = run.catch(() => {});
-  return run;
-}
+// All tool calls share one browser/page, so only one may run at a time.
+// Parallel batches arrive in nondeterministic order (a close_browser can land
+// mid-run), so instead of queueing them in scrambled order, reject concurrent
+// calls outright — the client sees the error and re-issues steps one by one.
+let activeTool: string | null = null;
+const BUSY_ERROR = (name: string) => ({
+  content: [{
+    type: 'text' as const,
+    text: `Tool "${name}" REJECTED: tool "${activeTool}" is still running. ` +
+          `This server executes ONE tool at a time. Emit exactly one tool call, ` +
+          `wait for its result, then send the next.`,
+  }],
+  isError: true,
+});
 
 /**
  * Build a fully wired MCP Server instance.
@@ -73,7 +79,11 @@ export function createServer(): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
     console.error(`[playwright-mcp] tool call: ${name} ${JSON.stringify(args)}`);
-    return enqueue(async () => {
+    if (activeTool) {
+      console.error(`[playwright-mcp] REJECTED ${name} (busy with ${activeTool})`);
+      return BUSY_ERROR(name);
+    }
+    activeTool = name;
 
     try {
       let result: unknown;
@@ -104,9 +114,9 @@ export function createServer(): Server {
         content: [{ type: 'text', text: `Tool "${name}" failed: ${message}` }],
         isError: true,
       };
+    } finally {
+      activeTool = null;
     }
-
-    });
   });
 
   return server;
