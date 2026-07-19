@@ -31,27 +31,36 @@ export async function getPageState(args: { includeHtml?: boolean; selector?: str
   const title = await page.title();
   const url   = page.url();
 
-  // Visible text (trimmed, max 3000 chars)
+  // Visible text (trimmed — every char here is a token the LLM pays for each round)
   const visibleText = await page.evaluate((sel) => {
     const root = sel ? document.querySelector(sel) : document.body;
-    return (root as HTMLElement)?.innerText?.replace(/\s+/g, ' ').trim().slice(0, 3000) ?? '';
+    return (root as HTMLElement)?.innerText?.replace(/\s+/g, ' ').trim().slice(0, 800) ?? '';
   }, args.selector ?? null);
 
-  // Interactive elements
+  // Interactive elements — visible ones only, null fields omitted, compact
   const interactive = await page.evaluate(() => {
     const els = Array.from(document.querySelectorAll(
       'button, input, select, textarea, a[href], [role="button"], [tabindex]'
     ));
-    return els.slice(0, 50).map(el => ({
-      tag:         el.tagName.toLowerCase(),
-      id:          el.id || null,
-      name:        (el as HTMLInputElement).name || null,
-      type:        (el as HTMLInputElement).type || null,
-      text:        (el as HTMLElement).innerText?.trim().slice(0, 80) || null,
-      placeholder: (el as HTMLInputElement).placeholder || null,
-      href:        (el as HTMLAnchorElement).href || null,
-      visible:     (el as HTMLElement).offsetParent !== null,
-    }));
+    return els
+      .filter(el => (el as HTMLElement).offsetParent !== null)
+      .slice(0, 25)
+      .map(el => {
+        const entry: Record<string, string> = { tag: el.tagName.toLowerCase() };
+        const id          = el.id;
+        const name        = (el as HTMLInputElement).name;
+        const type        = (el as HTMLInputElement).type;
+        const text        = (el as HTMLElement).innerText?.trim().slice(0, 60);
+        const placeholder = (el as HTMLInputElement).placeholder;
+        const href        = (el as HTMLAnchorElement).getAttribute?.('href') ?? '';
+        if (id)          entry.id = id;
+        if (name)        entry.name = name;
+        if (type)        entry.type = type;
+        if (text)        entry.text = text;
+        if (placeholder) entry.placeholder = placeholder;
+        if (href)        entry.href = href.slice(0, 100);
+        return entry;
+      });
   });
 
   const result: Record<string, unknown> = {
