@@ -9,20 +9,25 @@ export class BrowserManager {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  // Concurrent getPage() calls must share one launch, not race several
+  private launchLock: Promise<Page> | null = null;
 
   async getPage(): Promise<Page> {
-    if (!this.browser) {
-      this.browser = await chromium.launch({ headless: true });
-      this.context = await this.browser.newContext({
-        viewport: { width: 1280, height: 800 },
-        userAgent: 'playwright-mcp/1.0',
-      });
-      this.page = await this.context.newPage();
+    if (this.page) return this.page;
+    if (!this.launchLock) {
+      this.launchLock = (async () => {
+        if (!this.browser) {
+          this.browser = await chromium.launch({ headless: true });
+          this.context = await this.browser.newContext({
+            viewport: { width: 1280, height: 800 },
+            userAgent: 'playwright-mcp/1.0',
+          });
+        }
+        this.page = await this.context!.newPage();
+        return this.page;
+      })().finally(() => { this.launchLock = null; });
     }
-    if (!this.page) {
-      this.page = await this.context!.newPage();
-    }
-    return this.page;
+    return this.launchLock;
   }
 
   async close(): Promise<void> {

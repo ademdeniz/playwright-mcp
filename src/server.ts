@@ -44,6 +44,15 @@ const ALL_TOOLS = [
   closeBrowserTool,
 ];
 
+// All tool calls share one browser/page, so execution is serialized
+// process-wide: if a client sends parallel tool calls, they run in order.
+let toolQueue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = toolQueue.then(task, task);
+  toolQueue = run.catch(() => {});
+  return run;
+}
+
 /**
  * Build a fully wired MCP Server instance.
  * Each transport connection gets its own Server; they all share the
@@ -63,6 +72,8 @@ export function createServer(): Server {
   // ── Call tools ────────────────────────────────────────────────────────────
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
+    console.error(`[playwright-mcp] tool call: ${name} ${JSON.stringify(args)}`);
+    return enqueue(async () => {
 
     try {
       let result: unknown;
@@ -94,6 +105,8 @@ export function createServer(): Server {
         isError: true,
       };
     }
+
+    });
   });
 
   return server;
