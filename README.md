@@ -4,7 +4,7 @@
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)
 ![Playwright](https://img.shields.io/badge/Playwright-1.43+-green?logo=playwright)
-![MCP](https://img.shields.io/badge/MCP-stdio-purple)
+![MCP](https://img.shields.io/badge/MCP-stdio%20%7C%20SSE-purple)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
@@ -122,6 +122,70 @@ Add to `~/.cursor/mcp.json`:
 
 ---
 
+## QA Agent Setup (LibreChat + SSE)
+
+Beyond stdio hosts, this server ships an **SSE transport** so Docker-hosted MCP
+clients — like a self-hosted [LibreChat](https://www.librechat.ai/) — can drive
+the browser over HTTP. This powers a full **AI QA Engineer agent**: a chat UI
+where you type test steps in plain English and watch them execute against a
+real browser, with tunable model parameters, reusable skills, and a local
+audit log of every tool call.
+
+### Run the SSE server
+
+```bash
+npm run start:sse          # http://0.0.0.0:8931 — GET /sse, POST /messages, GET /health
+PORT=9000 npm run start:sse
+```
+
+Binds `0.0.0.0` so containers reach it via `host.docker.internal`.
+
+### Register in LibreChat (`librechat.yaml`)
+
+```yaml
+mcpSettings:
+  allowedAddresses:        # SSRF exemption for the host-mapped address
+    - 'host.docker.internal:8931'
+
+mcpServers:
+  playwright:
+    type: sse
+    url: http://host.docker.internal:8931/sse
+    timeout: 300000
+```
+
+Then build an agent in LibreChat's Agent Builder: attach the `playwright` MCP
+tools, paste [`examples/librechat-agent-instructions.md`](examples/librechat-agent-instructions.md)
+into the Instructions field, and add the skills from
+[`examples/skills/`](examples/skills/) (app selector map, spec-writing
+conventions, executable regression scenarios).
+
+### Model notes (learned the hard way)
+
+- **Context window matters**: Ollama defaults to 4096 tokens, which silently
+  truncates tool schemas — the model then hallucinates Selenium code instead of
+  calling tools. Run `OLLAMA_CONTEXT_LENGTH=8192 ollama serve` minimum.
+- **Thinking models stall**: qwen3-style reasoning burns minutes of monologue
+  per tool call on modest hardware. Use a non-thinking instruct variant, or a
+  fast cloud endpoint (Groq / Gemini free tiers) for the agent brain while the
+  browser and tests stay local.
+- **Some models batch tool calls**: llama-3.3 emits all steps at once, which
+  arrive in scrambled order. The server rejects concurrent calls with an
+  instructive error so such clients recover by re-issuing steps one at a time.
+
+### Hardening built into the server
+
+- **One tool at a time** — concurrent calls are rejected, not queued, so a
+  stray `close_browser` can never execute mid-scenario
+- **Launch lock** — concurrent `getPage()` calls share one Chromium launch
+  instead of racing several
+- **Token-lean page state** — `get_page_state` caps text and element output,
+  since agent loops re-pay for every past tool result on each round
+- **Call logging** — every tool call is logged with its arguments; when the
+  client's transcript and reality disagree, the server log is ground truth
+
+---
+
 ## Example Flows
 
 ### Login test
@@ -161,19 +225,22 @@ Claude: navigate → click Submit → get_page_state
 ```
 playwright-mcp/
 ├── src/
-│   ├── server.ts              # MCP server — registers tools, handles requests
-│   ├── browser.ts             # BrowserManager — single browser/page lifecycle
+│   ├── server.ts              # MCP server — tools, one-at-a-time execution, call log
+│   ├── sse.ts                 # SSE transport — HTTP endpoint for Docker-hosted clients
+│   ├── browser.ts             # BrowserManager — single browser/page, launch lock
 │   └── tools/
 │       ├── navigate.ts        # page.goto()
-│       ├── getPageState.ts    # title + text + elements + errors
+│       ├── getPageState.ts    # title + text + elements + errors (token-lean)
 │       ├── screenshot.ts      # page/element screenshot → base64
-│       ├── click.ts           # locator.click() by selector or text
+│       ├── click.ts           # locator.click() — selector preferred over text
 │       ├── fill.ts            # locator.fill()
 │       ├── evaluate.ts        # page.evaluate(js)
 │       ├── assert.ts          # 8 assertion types
 │       └── closeBrowser.ts    # browser.close()
 ├── examples/
 │   ├── claude_desktop_config.json
+│   ├── librechat-agent-instructions.md   # QA agent system prompt for LibreChat
+│   ├── skills/                # LibreChat skills — app map, spec conventions, scenarios
 │   ├── login_flow.md
 │   └── failure_analysis.md
 ├── package.json
@@ -204,5 +271,5 @@ This server is part of a broader AI-powered QA tooling portfolio:
 ## Author
 
 **Adem Garic** — SDET / QA Engineer
-4+ years in mobile and web test automation (Appium, Selenium, Jenkins, BrowserStack)
+6+ years in mobile and web test automation (Appium, Selenium, Playwright, Jenkins, BrowserStack)
 [LinkedIn](https://linkedin.com/in/adem-garic-sdet-qa) · [GitHub](https://github.com/ademdeniz)
