@@ -2,12 +2,28 @@
 
 Every block below is a single command, safe to copy-paste as-is.
 
-## Daily start (after reboot)
+## Daily start (after reboot) — ONE command
 
-Run these three in order. All are safe to re-run if already running.
+Starts everything, waits until LibreChat responds, then opens the browser itself:
+
+```bash
+~/playwright-mcp/scripts/start-stack.sh
+```
+
+When the browser opens: My Agents → QA Engineer. Groq brain is cloud, nothing to start for it.
+Safe to re-run any time; it skips whatever is already running.
+
+If it prints an error after 3 minutes: this 8 GB machine can kill the Colima VM
+under memory pressure. Close Chrome tabs, then run it again.
+
+Manual equivalent, if you ever need the individual steps:
 
 ```bash
 colima start
+```
+
+```bash
+cd ~/playwright-mcp && npm run start:sse > /tmp/mcp-sse.log 2>&1 &
 ```
 
 ```bash
@@ -15,16 +31,8 @@ cd ~/LibreChat && docker compose up -d
 ```
 
 ```bash
-cd ~/playwright-mcp && npm run start:sse > /tmp/mcp-sse.log 2>&1 &
+open http://localhost:3080
 ```
-
-Then open http://localhost:3080 → My Agents → QA Engineer.
-Groq brain is cloud, nothing to start for it.
-
-Note: `docker compose up -d` is required — a previous `docker compose down`
-REMOVES containers, and `colima start` alone will not bring them back.
-If the UI still does not come up: this 8 GB machine can kill the Colima VM
-under memory pressure. Close Chrome tabs, then rerun the three commands.
 
 ## Health checks
 
