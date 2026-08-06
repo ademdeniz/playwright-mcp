@@ -125,7 +125,9 @@ Add to `~/.cursor/mcp.json`:
 ## QA Agent Setup (LibreChat + SSE)
 
 > Day-to-day operations (start, stop, health checks, logs) are collected in
-> [COMMANDS.md](COMMANDS.md).
+> [COMMANDS.md](COMMANDS.md). The complete agent recipe (endpoint, model
+> parameters, instructions, skills) is in
+> [examples/qa-agent-setup.md](examples/qa-agent-setup.md).
 
 Beyond stdio hosts, this server ships an **SSE transport** so Docker-hosted MCP
 clients — like a self-hosted [LibreChat](https://www.librechat.ai/) — can drive
