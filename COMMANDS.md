@@ -1,12 +1,16 @@
 # AI QA Stack — Command Cheat Sheet
 
-## Daily start (after reboot)
+## Daily start (after reboot) — all three are safe to re-run
 ```bash
 colima start
+cd ~/LibreChat && docker compose up -d
 cd ~/playwright-mcp && npm run start:sse > /tmp/mcp-sse.log 2>&1 &
 ```
 Then open http://localhost:3080 → My Agents → QA Engineer.
-(LibreChat containers auto-start with Colima. Groq brain is cloud, nothing to start.)
+(Groq brain is cloud, nothing to start. `docker compose up -d` is required after
+a `docker compose down` — down REMOVES containers, colima alone won't revive them.
+If the UI still doesn't come up, run the health checks below; on this 8 GB machine
+the Colima VM can be killed by memory pressure — close Chrome tabs and re-run.)
 
 ## Health checks
 ```bash
