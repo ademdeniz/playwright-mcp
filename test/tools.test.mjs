@@ -46,7 +46,7 @@ test('lists every tool', async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map(t => t.name).sort(), [
     'assert', 'click', 'close_browser', 'evaluate', 'fill', 'get_page_state',
-    'navigate', 'press_key', 'screenshot', 'select_option', 'wait_for',
+    'navigate', 'press_key', 'screenshot', 'select_option', 'set_viewport', 'wait_for',
   ]);
 });
 
@@ -173,6 +173,16 @@ test('evaluate can be disabled', async () => {
   } finally {
     await c.close();
   }
+});
+
+test('set_viewport resizes and reports horizontal scroll', async () => {
+  await call('navigate', { url: `${site.base}/login` });
+  const narrow = await call('set_viewport', { width: 320, height: 640 });
+  assert.equal(narrow.json.viewport.width, 320);
+  assert.equal(await call('evaluate', { expression: 'window.innerWidth' }).then(r => r.json.result), 320);
+  const bad = await call('set_viewport', { width: 10 });
+  assert.equal(bad.isError, true);
+  await call('set_viewport', { width: 1280, height: 800 });
 });
 
 test('close_browser then continue', async () => {

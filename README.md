@@ -78,6 +78,7 @@ Claude will navigate, fill the form, click submit, assert the result, and take a
 | `select_option` | Choose a `<select>` option by value, label, or index |
 | `press_key` | Press `Enter`, `Escape`, `Tab`, chords like `Control+A` |
 | `wait_for` | Wait for an element state, visible text, or URL |
+| `set_viewport` | Resize the viewport (e.g. 320 px wide for mobile layout and reflow checks); reports horizontal scrolling |
 | `evaluate` | Run JavaScript in the page context (can be disabled) |
 | `assert` | `title_contains`, `url_contains`, `text_visible`, `text_absent`, `element_exists`, `element_visible`, `element_hidden`, `input_value`, `element_count` — retries up to 5 s by default |
 | `close_browser` | Close browser and release resources |
@@ -360,6 +361,7 @@ playwright-mcp/
 │       ├── selectOption.ts    # locator.selectOption()
 │       ├── pressKey.ts        # keyboard.press()
 │       ├── waitFor.ts         # wait for element / text / URL
+│       ├── setViewport.ts     # page.setViewportSize()
 │       ├── evaluate.ts        # page.evaluate(js)
 │       ├── assert.ts          # 9 assertion types, auto-retry
 │       ├── closeBrowser.ts    # browser.close()
