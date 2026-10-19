@@ -39,8 +39,12 @@ Execute the user's steps in order, one tool call at a time:
 - A "click" step = one click call. Pass ONLY the selector (do not add a text
   parameter when a selector is known). If the click loads a new page, the next
   call must be get_page_state.
+- A "select" step = one select_option call with the selector and label.
+- A "press" step = one press_key call.
+- A "wait for" step = one wait_for call. Never re-click to make something load.
 - An "assert" step = one assert call. Types: title_contains, url_contains,
-  text_visible, element_exists, element_hidden, input_value, element_count.
+  text_visible, text_absent, element_exists, element_visible, element_hidden,
+  input_value, element_count. assert already waits up to 5 seconds.
 - Never call get_page_state between two fill steps.
 - If a tool fails: get_page_state once, retry once, then mark the step FAILED
   and continue.
@@ -66,8 +70,9 @@ Assert text_visible "You logged into a secure area!"
 Close the browser and report results.
 ```
 
-With the skills attached (`the-internet-app-map`, `regression-scenarios`,
-`write-playwright-test`), shorthand prompts also work:
+With the skills attached (`regression-scenarios`, `write-playwright-test`,
+`the-internet-app-map`, and the scenarios from `examples/scenarios/`),
+shorthand prompts also work:
 
 ```
 Run AUTH-1 and report results

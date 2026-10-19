@@ -1,24 +1,26 @@
 import { browserManager } from '../browser.js';
+import { requireString } from './util.js';
 
 export const evaluateTool = {
   name: 'evaluate',
-  description: 'Execute JavaScript in the browser page context and return the result. Use for assertions, reading DOM values, or custom interactions.',
+  description: 'Execute JavaScript in the browser page context and return the result. Use for reading DOM values or checks the other tools cannot express. The value of the last expression is returned.',
   inputSchema: {
     type: 'object',
     properties: {
       expression: {
         type: 'string',
-        description: 'JavaScript expression to evaluate. Must be a valid JS expression (not a statement). Example: "document.title" or "document.querySelector(\'h1\').textContent"',
+        description: 'JavaScript to evaluate. Example: "document.title" or "document.querySelectorAll(\'img\').length"',
       },
     },
     required: ['expression'],
   },
 } as const;
 
-export async function evaluate(args: { expression: string }) {
+export async function evaluate(args: Record<string, unknown>) {
+  const expression = requireString(args, 'expression', 'evaluate');
   const page = await browserManager.getPage();
   try {
-    const result = await page.evaluate(args.expression);
+    const result = await page.evaluate(expression);
     return {
       result,
       type:    typeof result,

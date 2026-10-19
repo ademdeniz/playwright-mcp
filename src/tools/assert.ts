@@ -1,102 +1,140 @@
+import { Page } from 'playwright';
 import { browserManager } from '../browser.js';
+import { ToolInputError, normalize } from './util.js';
+
+const TYPES = [
+  'title_contains', 'url_contains', 'text_visible', 'text_absent',
+  'element_exists', 'element_visible', 'element_hidden', 'input_value', 'element_count',
+] as const;
+type AssertType = typeof TYPES[number];
+
+const NEEDS_SELECTOR: AssertType[] = ['element_exists', 'element_visible', 'element_hidden', 'input_value', 'element_count'];
+const NEEDS_EXPECTED: AssertType[] = ['title_contains', 'url_contains', 'text_visible', 'text_absent', 'input_value'];
 
 export const assertTool = {
   name: 'assert',
-  description: 'Assert a condition about the current page state. Returns pass/fail with details — use this to verify test expectations.',
+  description: 'Assert a condition about the current page. Retries until it passes or the timeout expires (default 5 s), so it is safe to call right after an action that updates the page. Returns pass/fail with the actual value.',
   inputSchema: {
     type: 'object',
     properties: {
       type: {
         type: 'string',
-        enum: ['title_contains', 'url_contains', 'text_visible', 'element_exists',
-               'element_hidden', 'input_value', 'element_count'],
-        description: 'The type of assertion to perform',
+        enum: TYPES,
+        description: 'title_contains / url_contains / text_visible / text_absent need "expected". ' +
+                     'element_exists / element_visible / element_hidden need "selector". ' +
+                     'input_value needs both. element_count needs "selector" and "count".',
       },
       selector: {
         type: 'string',
-        description: 'CSS selector (required for element_exists, element_hidden, input_value, element_count, text_visible with scope)',
+        description: 'CSS selector. For text_visible / text_absent it limits the search to that element.',
       },
       expected: {
         type: 'string',
-        description: 'Expected value or text to match against',
+        description: 'Expected text or value (substring match, whitespace-insensitive; exact for input_value)',
       },
       count: {
         type: 'number',
-        description: 'Expected element count (for element_count type)',
+        description: 'Expected element count (for element_count)',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Milliseconds to keep retrying before failing (default: 5000, 0 = check once)',
       },
     },
     required: ['type'],
   },
 } as const;
 
-type AssertType =
-  | 'title_contains' | 'url_contains' | 'text_visible'
-  | 'element_exists' | 'element_hidden' | 'input_value' | 'element_count';
-
-export async function assert(args: {
+interface AssertArgs {
   type: AssertType;
   selector?: string;
   expected?: string;
   count?: number;
-}) {
-  const page = await browserManager.getPage();
+  timeout?: number;
+}
 
-  let passed = false;
-  let actual: unknown = null;
+async function textOf(page: Page, selector?: string): Promise<string> {
+  const texts = selector
+    ? await page.locator(selector).allInnerTexts()
+    : [await page.evaluate(() => document.body?.innerText ?? '')];
+  return normalize(texts.join(' '));
+}
 
+async function check(page: Page, args: AssertArgs): Promise<{ passed: boolean; actual: unknown }> {
+  const sel = args.selector!;
+  const expected = normalize(args.expected ?? '');
   switch (args.type) {
     case 'title_contains': {
-      actual = await page.title();
-      passed = (actual as string).includes(args.expected ?? '');
-      break;
+      const actual = await page.title();
+      return { passed: actual.includes(args.expected!), actual };
     }
     case 'url_contains': {
-      actual = page.url();
-      passed = (actual as string).includes(args.expected ?? '');
-      break;
+      const actual = page.url();
+      return { passed: actual.includes(args.expected!), actual };
     }
     case 'text_visible': {
-      if (args.selector) {
-        actual = await page.locator(args.selector).innerText().catch(() => '');
-        passed = (actual as string).includes(args.expected ?? '');
-      } else {
-        actual = await page.evaluate(() => document.body.innerText);
-        passed = (actual as string).includes(args.expected ?? '');
-      }
-      break;
+      const text = await textOf(page, args.selector);
+      return { passed: text.includes(expected), actual: text.slice(0, 300) };
+    }
+    case 'text_absent': {
+      const text = await textOf(page, args.selector);
+      return { passed: !text.includes(expected), actual: text.slice(0, 300) };
     }
     case 'element_exists': {
-      const count = await page.locator(args.selector!).count();
-      actual = count;
-      passed = count > 0;
-      break;
+      const actual = await page.locator(sel).count();
+      return { passed: actual > 0, actual };
+    }
+    case 'element_visible': {
+      const actual = await page.locator(sel).filter({ visible: true }).count();
+      return { passed: actual > 0, actual };
     }
     case 'element_hidden': {
-      const count = await page.locator(args.selector!).count();
-      actual = count;
-      passed = count === 0;
-      break;
+      // Absent from the DOM, or present but not visible
+      const actual = await page.locator(sel).filter({ visible: true }).count();
+      return { passed: actual === 0, actual };
     }
     case 'input_value': {
-      actual = await page.locator(args.selector!).inputValue().catch(() => '');
-      passed = actual === args.expected;
-      break;
+      const actual = await page.locator(sel).first().inputValue({ timeout: 1_000 }).catch(() => null);
+      return { passed: actual === args.expected, actual };
     }
     case 'element_count': {
-      actual = await page.locator(args.selector!).count();
-      passed = actual === args.count;
-      break;
+      const actual = await page.locator(sel).count();
+      return { passed: actual === args.count, actual };
     }
   }
+}
 
+export async function assert(args: AssertArgs) {
+  if (!TYPES.includes(args.type)) {
+    throw new ToolInputError(`assert: "type" must be one of ${TYPES.join(', ')}.`);
+  }
+  if (NEEDS_SELECTOR.includes(args.type) && !args.selector) {
+    throw new ToolInputError(`assert: type "${args.type}" requires "selector".`);
+  }
+  if (NEEDS_EXPECTED.includes(args.type) && typeof args.expected !== 'string') {
+    throw new ToolInputError(`assert: type "${args.type}" requires "expected".`);
+  }
+  if (args.type === 'element_count' && typeof args.count !== 'number') {
+    throw new ToolInputError('assert: type "element_count" requires "count".');
+  }
+
+  const page = await browserManager.getPage();
+  const deadline = Date.now() + Math.max(args.timeout ?? 5_000, 0);
+  let result = await check(page, args);
+  while (!result.passed && Date.now() < deadline) {
+    await page.waitForTimeout(250);
+    result = await check(page, args);
+  }
+
+  const expected = args.expected ?? args.count ?? null;
   return {
-    passed,
+    passed:   result.passed,
     type:     args.type,
     selector: args.selector ?? null,
-    expected: args.expected ?? args.count ?? null,
-    actual,
-    message:  passed
+    expected,
+    actual:   result.actual,
+    message:  result.passed
       ? `✓ ${args.type} passed`
-      : `✗ ${args.type} failed — expected "${args.expected ?? args.count}", got "${actual}"`,
+      : `✗ ${args.type} failed — expected ${JSON.stringify(expected ?? args.selector)}, got ${JSON.stringify(result.actual)}`,
   };
 }

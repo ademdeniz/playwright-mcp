@@ -23,8 +23,12 @@ colima start
 ```
 
 ```bash
-cd ~/playwright-mcp && npm run start:sse > /tmp/mcp-sse.log 2>&1 &
+cd ~/playwright-mcp && HOST=0.0.0.0 PLAYWRIGHT_MCP_ALLOW_NO_AUTH=1 npm run start:sse > /tmp/mcp-sse.log 2>&1 &
 ```
+
+The server listens on localhost only by default; `HOST=0.0.0.0` lets the
+LibreChat container reach it. To require a token instead of `ALLOW_NO_AUTH`,
+see README "Securing the HTTP server".
 
 ```bash
 cd ~/LibreChat && docker compose up -d
@@ -36,7 +40,7 @@ open http://localhost:3080
 
 ## Health checks
 
-MCP server + LibreChat connection. Want `{"ok":true,"sessions":1}` or more:
+MCP server + LibreChat connection. Want `"ok":true` and `"sessions"` of 1 or more:
 
 ```bash
 curl -s http://localhost:8931/health
@@ -83,7 +87,13 @@ OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_KEEP_ALIVE=2h ollama serve > /tmp/ollama.log 2
 ## After changing playwright-mcp code
 
 ```bash
-cd ~/playwright-mcp && npm run build && pkill -f "node dist/sse.js"; sleep 1; cd ~/playwright-mcp && npm run start:sse > /tmp/mcp-sse.log 2>&1 &
+cd ~/playwright-mcp && npm run build && pkill -f "node dist/sse.js"; sleep 1; cd ~/playwright-mcp && HOST=0.0.0.0 PLAYWRIGHT_MCP_ALLOW_NO_AUTH=1 npm run start:sse > /tmp/mcp-sse.log 2>&1 &
+```
+
+Run the server's own test suite:
+
+```bash
+cd ~/playwright-mcp && npm test
 ```
 
 ## After changing librechat.yaml
@@ -161,7 +171,7 @@ docker logs LibreChat --since 5m 2>&1 | grep -iE "mcp|error"
 | Port | Service |
 |---|---|
 | 3080 | LibreChat UI |
-| 8931 | playwright-mcp SSE: /sse /messages /health |
+| 8931 | playwright-mcp HTTP: /mcp /sse /messages /health |
 | 11434 | Ollama (only when running local models) |
 
 ## Repos

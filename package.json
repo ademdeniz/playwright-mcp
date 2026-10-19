@@ -1,22 +1,39 @@
 {
   "name": "playwright-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server that exposes Playwright browser automation as tools for Claude — enabling AI-driven web testing, autonomous test execution, and live failure analysis.",
   "main": "dist/server.js",
   "bin": {
-    "playwright-mcp": "dist/server.js"
+    "playwright-mcp":      "dist/server.js",
+    "playwright-mcp-http": "dist/sse.js"
   },
+  "files": [
+    "dist/**/*.js",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build":   "tsc",
     "start":   "node dist/server.js",
     "start:sse": "node dist/sse.js",
     "dev":     "ts-node src/server.ts",
     "dev:sse": "ts-node src/sse.ts",
-    "install-browsers": "playwright install chromium"
+    "test":    "npm run build && node --test test/*.test.mjs",
+    "install-browsers": "playwright install chromium",
+    "prepublishOnly": "npm test"
   },
+  "keywords": ["mcp", "model-context-protocol", "playwright", "qa", "e2e", "testing", "claude", "browser-automation"],
+  "author": "Adem Garic",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ademdeniz/playwright-mcp.git"
+  },
+  "homepage": "https://github.com/ademdeniz/playwright-mcp#readme",
+  "bugs": "https://github.com/ademdeniz/playwright-mcp/issues",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",
-    "playwright":                "^1.43.0"
+    "playwright":                "^1.51.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -24,7 +41,7 @@
     "typescript":  "^5.4.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "license": "MIT"
 }
