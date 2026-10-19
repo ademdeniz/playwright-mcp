@@ -11,6 +11,7 @@
  *   select_option  — choose a <select> option
  *   press_key      — press a key or chord
  *   wait_for       — wait for an element, text, or URL
+ *   set_viewport   — resize the viewport (mobile layout, reflow)
  *   evaluate       — run JavaScript in the page (can be disabled)
  *   assert         — verify page state, retrying until it passes or times out
  *   close_browser  — close browser and free resources
@@ -39,6 +40,7 @@ import { fillTool,         fill         } from './tools/fill.js';
 import { selectOptionTool, selectOption } from './tools/selectOption.js';
 import { pressKeyTool,     pressKey     } from './tools/pressKey.js';
 import { waitForTool,      waitFor      } from './tools/waitFor.js';
+import { setViewportTool,  setViewport  } from './tools/setViewport.js';
 import { getPageStateTool, getPageState } from './tools/getPageState.js';
 import { evaluateTool,     evaluate     } from './tools/evaluate.js';
 import { assertTool,       assert       } from './tools/assert.js';
@@ -58,6 +60,7 @@ const TOOLS: { definition: { name: string }; handler: Handler }[] = [
   { definition: selectOptionTool, handler: selectOption },
   { definition: pressKeyTool,     handler: pressKey     },
   { definition: waitForTool,      handler: waitFor      },
+  { definition: setViewportTool,  handler: setViewport  },
   ...(config.allowEvaluate ? [{ definition: evaluateTool, handler: evaluate }] : []),
   { definition: assertTool,       handler: assert       },
   { definition: closeBrowserTool, handler: closeBrowser },

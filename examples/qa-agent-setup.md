@@ -8,7 +8,7 @@ Endpoint (which brains are available)
   └─ Agent (name, model, parameters)
        └─ Instructions (always-loaded behavior rules)
             └─ Skills (on-demand knowledge packs)
-                 └─ MCP tools (the 11 browser tools from this server)
+                 └─ MCP tools (the 12 browser tools from this server)
 ```
 
 ## 1. Endpoint — librechat.yaml
@@ -45,7 +45,7 @@ Lessons encoded above:
   - `openai/gpt-oss-120b` (Groq free): disciplined tool caller, good default
   - `llama-3.3-70b` (Groq free): fast but batches tool calls; needs the guardrails
   - local 4b models (Ollama): workable for demos only; see README "Model notes"
-- **Tools**: attach the `playwright` MCP server (all 11 tools)
+- **Tools**: attach the `playwright` MCP server (all 12 tools)
 
 ## 3. Model parameters (values that work, and why)
 
