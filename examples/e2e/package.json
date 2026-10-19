@@ -1,0 +1,14 @@
+{
+  "name": "playwright-mcp-e2e-examples",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Self-contained Playwright specs generated from docs/test-plans/login.md. Not part of the MCP server build.",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "install-browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0"
+  }
+}
