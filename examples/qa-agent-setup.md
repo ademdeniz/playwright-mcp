@@ -8,7 +8,7 @@ Endpoint (which brains are available)
   └─ Agent (name, model, parameters)
        └─ Instructions (always-loaded behavior rules)
             └─ Skills (on-demand knowledge packs)
-                 └─ MCP tools (the 8 browser tools from this server)
+                 └─ MCP tools (the 11 browser tools from this server)
 ```
 
 ## 1. Endpoint — librechat.yaml
@@ -45,7 +45,7 @@ Lessons encoded above:
   - `openai/gpt-oss-120b` (Groq free): disciplined tool caller, good default
   - `llama-3.3-70b` (Groq free): fast but batches tool calls; needs the guardrails
   - local 4b models (Ollama): workable for demos only; see README "Model notes"
-- **Tools**: attach the `playwright` MCP server (all 8 tools)
+- **Tools**: attach the `playwright` MCP server (all 11 tools)
 
 ## 3. Model parameters (values that work, and why)
 
@@ -73,17 +73,20 @@ Key design principles, learned on small models and kept for all models:
 
 ## 5. Skills (reusable knowledge packs)
 
-From [`skills/`](skills/) — Name + Description + Instructions per skill.
-The Description is the trigger: it's how the model decides when to pull the skill in.
+Name + Description + Instructions per skill. The Description is the trigger:
+it's how the model decides when to pull the skill in.
 
-| Skill | Contents | Why it exists |
-|---|---|---|
-| `the-internet-app-map` | Verified URLs, selectors, credentials, expected messages | Kills selector hallucination — answers are in context |
-| `write-playwright-test` | Repo conventions: POM, fixtures, tags, web-first asserts | "Write this as a test" produces committable specs |
-| `regression-scenarios` | Numbered runbooks (AUTH-1..3, UI-1..2) with reporting format | "Run AUTH-1" just works |
+| Skill | Source | Contents | Why it exists |
+|---|---|---|---|
+| `regression-scenarios` | [`skills/`](../skills/regression-scenarios/SKILL.md) | How to run scenarios, failure classes, report format | "Run AUTH-1" just works, failures get a root cause |
+| `write-playwright-test` | [`skills/`](../skills/write-playwright-test/SKILL.md) | Locator priority, step → Playwright mapping, delivery checklist | "Write this as a test" produces committable specs |
+| `the-internet-app-map` | [`examples/skills/`](skills/the-internet-app-map.md) | Verified URLs, selectors, credentials, expected messages | Kills selector hallucination — answers are in context |
+| `playwright-e2e-conventions` | [`examples/skills/`](skills/playwright-e2e-conventions.md) | playwright-e2e repo: POM, fixtures, tags | Specs match that repo exactly |
+| `the-internet` scenarios | [`examples/scenarios/`](scenarios/the-internet.md) | AUTH-1..3, UI-1..2 | The runbooks `regression-scenarios` executes |
 
 Split rationale: **Instructions = always-loaded behavior. Skills = on-demand
-knowledge.** New target app → new app-map skill, agent untouched.
+knowledge.** The two generic skills never change; a new target app needs only a
+new app map and scenario file, agent untouched.
 
 ## Validation: what a healthy run looks like
 
@@ -119,3 +122,7 @@ actions pass) and reports the actual error message as the root cause.
   the server rejection recovers it, but a better model fixes it at the source
 - UI transcript looks fine but run failed → read `/tmp/mcp-sse.log`; the server
   log is ground truth
+- `401` / `403` in the server log → token mismatch, or the server is bound to
+  localhost; check `HOST` and `PLAYWRIGHT_MCP_TOKEN` (README "Securing the HTTP server")
+- Model can't make sense of screenshots / errors on a text-only model → set
+  `PLAYWRIGHT_MCP_SCREENSHOT_IMAGE=false`

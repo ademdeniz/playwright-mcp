@@ -1,8 +1,9 @@
 import { browserManager } from '../browser.js';
+import { ToolInputError, visible } from './util.js';
 
 export const clickTool = {
   name: 'click',
-  description: 'Click an element on the page identified by a CSS selector or text content.',
+  description: 'Click an element identified by a CSS selector (preferred) or by its visible text. Waits up to 10 s for the element to become visible and clickable.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -12,11 +13,11 @@ export const clickTool = {
       },
       text: {
         type: 'string',
-        description: 'Visible text of the element to click (alternative to selector)',
+        description: 'Visible text of the element to click (use only when no selector is known)',
       },
       waitForNavigation: {
         type: 'boolean',
-        description: 'Wait for navigation after click (default: false)',
+        description: 'Wait for the page to navigate and load after the click (default: false)',
       },
     },
     required: [],
@@ -28,26 +29,35 @@ export async function click(args: {
   text?: string;
   waitForNavigation?: boolean;
 }) {
+  if (!args.selector && !args.text) {
+    throw new ToolInputError('click: provide either "selector" or "text".');
+  }
   const page = await browserManager.getPage();
 
   // An explicit CSS selector is the more precise signal — prefer it over
   // fuzzy text matching when a client supplies both.
   const locator = args.selector
-    ? page.locator(args.selector).first()
-    : page.getByText(args.text!, { exact: false }).first();
+    ? visible(page, args.selector)
+    : page.getByText(args.text!, { exact: false }).filter({ visible: true }).first();
 
-  if (args.waitForNavigation) {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'load', timeout: 15_000 }).catch(() => {}),
-      locator.click({ timeout: 10_000 }),
-    ]);
-  } else {
-    await locator.click({ timeout: 10_000 });
+  const urlBefore = page.url();
+  // A new tab is announced shortly *after* click() resolves, so listen first
+  const popup = page.context().waitForEvent('page', { timeout: 12_000 }).catch(() => null);
+  await locator.click({ timeout: 10_000 });
+
+  const opened = await Promise.race([popup, page.waitForTimeout(300).then(() => null)]);
+  if (opened) {
+    // browserManager has already made it the active page
+    await opened.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
+  } else if (args.waitForNavigation) {
+    await page.waitForURL(u => u.toString() !== urlBefore, { timeout: 15_000 }).catch(() => {});
+    await page.waitForLoadState('load', { timeout: 15_000 }).catch(() => {});
   }
 
+  const active = await browserManager.getPage();
   return {
     clicked:    args.selector ?? `text="${args.text}"`,
-    currentUrl: page.url(),
-    pageTitle:  await page.title(),
+    currentUrl: active.url(),
+    pageTitle:  await active.title(),
   };
 }

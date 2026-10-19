@@ -1,12 +1,13 @@
 ---
-name: write-playwright-test
-description: Convert an explored/verified browser scenario into a Playwright TypeScript spec matching the playwright-e2e repo conventions (Page Object Model, custom fixtures, @smoke/@regression tags). Use when asked to "write a test", "generate a spec", or "add this to the suite".
+name: playwright-e2e-conventions
+description: Conventions of the playwright-e2e repo (page objects, fixtures, tags, file layout). Use together with the write-playwright-test skill when the target repo is playwright-e2e.
 ---
 
-# Writing tests for the playwright-e2e repo
+# Conventions: the playwright-e2e repo
 
-After manually verifying a scenario in the browser, produce a spec file that drops
-straight into the repo. Follow these conventions exactly.
+Project-specific companion to the generic
+[`write-playwright-test`](../../skills/write-playwright-test/SKILL.md) skill. When the
+target is the playwright-e2e repo, these rules override its defaults.
 
 ## Repo layout
 

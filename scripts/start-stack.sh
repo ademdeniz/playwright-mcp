@@ -10,7 +10,15 @@ echo "[2/4] playwright-mcp SSE server..."
 if curl -sf -m 2 http://localhost:8931/health >/dev/null 2>&1; then
   echo "      already running"
 else
-  (cd "$HOME/playwright-mcp" && nohup npm run start:sse > /tmp/mcp-sse.log 2>&1 &)
+  # LibreChat runs in Docker, so the server must listen beyond loopback.
+  # With PLAYWRIGHT_MCP_TOKEN exported, requests need that bearer token
+  # (see README "Securing the HTTP server"); without it, auth is explicitly off.
+  if [ -n "${PLAYWRIGHT_MCP_TOKEN:-}" ]; then
+    (cd "$HOME/playwright-mcp" && HOST=0.0.0.0 nohup npm run start:sse > /tmp/mcp-sse.log 2>&1 &)
+  else
+    echo "      WARNING: no PLAYWRIGHT_MCP_TOKEN set — server is open to your local network"
+    (cd "$HOME/playwright-mcp" && HOST=0.0.0.0 PLAYWRIGHT_MCP_ALLOW_NO_AUTH=1 nohup npm run start:sse > /tmp/mcp-sse.log 2>&1 &)
+  fi
   sleep 3
 fi
 

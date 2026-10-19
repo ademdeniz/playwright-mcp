@@ -1,4 +1,5 @@
 import { browserManager } from '../browser.js';
+import { ToolInputError, requireString, visible } from './util.js';
 
 export const fillTool = {
   name: 'fill',
@@ -16,25 +17,32 @@ export const fillTool = {
       },
       clearFirst: {
         type: 'boolean',
-        description: 'Clear the field before typing (default: true)',
+        description: 'Replace the current content (default: true). false appends by typing key by key.',
       },
     },
     required: ['selector', 'value'],
   },
 } as const;
 
-export async function fill(args: { selector: string; value: string; clearFirst?: boolean }) {
+export async function fill(args: Record<string, unknown>) {
+  const selector = requireString(args, 'selector', 'fill');
+  if (typeof args.value !== 'string') throw new ToolInputError('fill: "value" is required and must be a string.');
+  const value = args.value;
+
   const page = await browserManager.getPage();
-  const locator = page.locator(args.selector).first();
+  const locator = visible(page, selector);
 
-  if (args.clearFirst !== false) {
-    await locator.clear();
+  if (args.clearFirst === false) {
+    await locator.pressSequentially(value, { timeout: 10_000 });
+  } else {
+    await locator.fill(value, { timeout: 10_000 });
   }
-  await locator.fill(args.value);
 
+  // Never echo secrets back into the transcript
+  const isPassword = await locator.getAttribute('type').then(t => t === 'password').catch(() => false);
   return {
-    selector:     args.selector,
+    selector,
     filled:       true,
-    currentValue: await locator.inputValue().catch(() => args.value),
+    currentValue: isPassword ? '<hidden>' : await locator.inputValue().catch(() => value),
   };
 }
