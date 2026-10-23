@@ -1,6 +1,9 @@
 // Local pages the tests drive, so the suite never depends on a public site.
 import http from 'node:http';
-import { spawn } from 'node:child_process';
+import https from 'node:https';
+import fs from 'node:fs';
+import os from 'node:os';
+import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -41,6 +44,31 @@ export async function startSite() {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return { base: `http://127.0.0.1:${server.address().port}`, close: () => server.close() };
+}
+
+/** HTTPS server with a throwaway self-signed certificate, or null if openssl is missing. */
+export async function startHttpsSite() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcp-cert-'));
+  try {
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
+      '-subj', '/CN=127.0.0.1', '-keyout', path.join(dir, 'key.pem'), '-out', path.join(dir, 'cert.pem')],
+      { stdio: 'ignore' });
+  } catch {
+    return null;
+  }
+  const server = https.createServer({
+    key:  fs.readFileSync(path.join(dir, 'key.pem')),
+    cert: fs.readFileSync(path.join(dir, 'cert.pem')),
+  }, (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<!doctype html><title>Preview env</title><p>secure preview</p>');
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return {
+    base:  `https://127.0.0.1:${server.address().port}`,
+    close: () => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); },
+  };
 }
 
 /** Start dist/sse.js and resolve once it is listening (or reject with its output if it exits). */

@@ -45,4 +45,10 @@ export const config = {
   screenshotImage:  bool('PLAYWRIGHT_MCP_SCREENSHOT_IMAGE', true),
   allowEvaluate:    !bool('PLAYWRIGHT_MCP_DISABLE_EVALUATE', false),
   allowFileUrls:    bool('PLAYWRIGHT_MCP_ALLOW_FILE_URLS', false),
+  // Persistent browser profile: logins (e.g. SSO) survive restarts
+  userDataDir:      process.env.PLAYWRIGHT_MCP_USER_DATA_DIR
+                      ? path.resolve(process.env.PLAYWRIGHT_MCP_USER_DATA_DIR.replace(/^~(?=$|\/)/, os.homedir()))
+                      : undefined,
+  // Accept self-signed / internal certificates — for test environments only
+  ignoreHttpsErrors: bool('PLAYWRIGHT_MCP_IGNORE_HTTPS_ERRORS', false),
 };

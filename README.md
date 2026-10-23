@@ -242,9 +242,47 @@ client config, or prefix the start command.
 | `PLAYWRIGHT_MCP_SCREENSHOT_IMAGE` | `true` | `false` returns screenshot metadata only (for text-only models) |
 | `PLAYWRIGHT_MCP_DISABLE_EVALUATE` | `false` | `true` removes the `evaluate` tool |
 | `PLAYWRIGHT_MCP_ALLOW_FILE_URLS` | `false` | `true` allows `navigate` to `file://` URLs |
+| `PLAYWRIGHT_MCP_USER_DATA_DIR` | — | Persistent browser profile folder: cookies and SSO logins survive `close_browser` and restarts (see below) |
+| `PLAYWRIGHT_MCP_IGNORE_HTTPS_ERRORS` | `false` | `true` accepts self-signed / internal certificates. Test environments only |
 | `HOST` / `PORT` | `127.0.0.1` / `8931` | HTTP server bind address and port |
 | `PLAYWRIGHT_MCP_TOKEN` | — | HTTP server: require `Authorization: Bearer <token>` |
 | `PLAYWRIGHT_MCP_ALLOW_NO_AUTH` | `false` | HTTP server: allow a non-localhost bind without a token |
+
+---
+
+## Testing behind SSO (company environments)
+
+The agent never types your SSO credentials: **you** log in once, in a visible
+browser, and the server keeps that session.
+
+1. Register the server with a visible browser and a persistent profile:
+
+   ```bash
+   claude mcp add --scope user playwright \
+     -e PLAYWRIGHT_MCP_HEADLESS=false \
+     -e PLAYWRIGHT_MCP_USER_DATA_DIR=~/.playwright-mcp/profile \
+     -- node /absolute/path/to/playwright-mcp/dist/server.js
+   ```
+
+   Add `-e PLAYWRIGHT_MCP_IGNORE_HTTPS_ERRORS=true` if your preview/test
+   environments use internal certificates the browser doesn't trust.
+2. Ask the agent to open your environment (e.g. a preview URL). When it lands
+   on the SSO page, log in yourself in the browser window it opened, then tell
+   the agent to continue.
+3. The SSO session is stored in the profile. Later sessions — and other
+   preview environments behind the same identity provider — usually go straight
+   through without logging in again, until your company's SSO session expires.
+
+Notes:
+
+- **One session per profile.** A visible browser locks its profile, so a second
+  session on the same folder gets a clear error. Give parallel sessions their
+  own folder (`…/profile-2`). Headless browsers don't lock it, so don't share a
+  profile between headless sessions either.
+- **The profile holds live login cookies.** Keep it in your home folder, never
+  in a repository, and delete it (`rm -rf ~/.playwright-mcp/profile`) to log out
+  everywhere.
+- Use test or preview environments and test accounts — not production.
 
 ---
 
