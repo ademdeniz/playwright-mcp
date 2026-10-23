@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { ROOT, startSite } from './fixtures.mjs';
+import { ROOT, startHttpsSite, startSite } from './fixtures.mjs';
 
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcp-test-'));
 let site;
@@ -162,6 +162,50 @@ test('a hung call times out and the browser recovers', async () => {
     assert.equal(again.json.statusCode, 200);
   } finally {
     await c.close();
+  }
+});
+
+test('persistent profile keeps logins across close_browser and server restarts', async () => {
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcp-profile-'));
+  const env = { PLAYWRIGHT_MCP_USER_DATA_DIR: profile };
+  try {
+    let c = await connect(env);
+    await call('navigate', { url: `${site.base}/login` }, c);
+    await call('evaluate', { expression: "document.cookie = 'sso_session=abc123; max-age=3600; path=/'" }, c);
+    assert.equal((await call('close_browser', {}, c)).json.closed, true);
+
+    await call('navigate', { url: `${site.base}/login` }, c);
+    const afterClose = await call('evaluate', { expression: 'document.cookie' }, c);
+    assert.match(afterClose.json.result, /sso_session=abc123/);
+    await c.close();
+
+    c = await connect(env);
+    await call('navigate', { url: `${site.base}/login` }, c);
+    const afterRestart = await call('evaluate', { expression: 'document.cookie' }, c);
+    assert.match(afterRestart.json.result, /sso_session=abc123/);
+    await c.close();
+  } finally {
+    fs.rmSync(profile, { recursive: true, force: true });
+  }
+});
+
+test('self-signed HTTPS is rejected by default and accepted when allowed', async (t) => {
+  const secure = await startHttpsSite();
+  if (!secure) return t.skip('openssl not available');
+  try {
+    const strict = await call('navigate', { url: `${secure.base}/` });
+    assert.equal(strict.isError, true);
+    assert.match(strict.text, /CERT|certificate/i);
+
+    const c = await connect({ PLAYWRIGHT_MCP_IGNORE_HTTPS_ERRORS: '1' });
+    try {
+      const relaxed = await call('navigate', { url: `${secure.base}/` }, c);
+      assert.equal(relaxed.json.statusCode, 200, relaxed.text);
+    } finally {
+      await c.close();
+    }
+  } finally {
+    secure.close();
   }
 });
 
