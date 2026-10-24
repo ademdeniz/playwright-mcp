@@ -32,6 +32,9 @@ export class BrowserManager {
   private page: Page | null = null;
   // A persistent context has no Browser object, so liveness is tracked here
   private alive = false;
+  // Can be switched at runtime with set_browser_mode (headless first pass,
+  // visible window to investigate or log in)
+  private headless = config.headless;
   // Concurrent getPage() calls must share one launch, not race several
   private launchLock: Promise<Page> | null = null;
   private diagnostics: Diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [] };
@@ -57,7 +60,7 @@ export class BrowserManager {
       this.reset();
       const type = { chromium, firefox, webkit }[config.browser];
       const options = {
-        headless:          config.headless,
+        headless:          this.headless,
         viewport:          config.viewport,
         userAgent:         config.userAgent,
         ignoreHTTPSErrors: config.ignoreHttpsErrors,
@@ -144,6 +147,30 @@ export class BrowserManager {
     // Closing a persistent context flushes the profile (cookies) to disk
     if (browser) await browser.close().catch(() => {});
     else if (context) await context.close().catch(() => {});
+  }
+
+  isHeadless(): boolean {
+    return this.headless;
+  }
+
+  /**
+   * Relaunch the browser in the other mode and reopen the page that was open.
+   * With a persistent profile, cookies (and so SSO logins) carry over.
+   */
+  async setMode(headless: boolean): Promise<{ headless: boolean; changed: boolean; reopened: string | null }> {
+    const url = this.page && !this.page.isClosed() ? this.page.url() : null;
+    const changed = headless !== this.headless;
+    if (changed || !this.alive) {
+      await this.close();
+      this.headless = headless;
+    }
+    let reopened: string | null = null;
+    if (changed && url && /^https?:/.test(url)) {
+      const page = await this.getPage();
+      await page.goto(url, { waitUntil: 'load', timeout: 30_000 }).catch(() => {});
+      reopened = page.url();
+    }
+    return { headless: this.headless, changed, reopened };
   }
 
   isOpen(): boolean {
