@@ -79,6 +79,7 @@ Claude will navigate, fill the form, click submit, assert the result, and take a
 | `press_key` | Press `Enter`, `Escape`, `Tab`, chords like `Control+A` |
 | `wait_for` | Wait for an element state, visible text, or URL |
 | `set_viewport` | Resize the viewport (e.g. 320 px wide for mobile layout and reflow checks); reports horizontal scrolling |
+| `set_browser_mode` | Switch between headless and a visible window while running: reopens the current page, keeps logins with a persistent profile |
 | `evaluate` | Run JavaScript in the page context (can be disabled) |
 | `assert` | `title_contains`, `url_contains`, `text_visible`, `text_absent`, `element_exists`, `element_visible`, `element_hidden`, `input_value`, `element_count` — retries up to 5 s by default |
 | `close_browser` | Close browser and release resources |
@@ -269,7 +270,12 @@ browser, and the server keeps that session.
 2. Ask the agent to open your environment (e.g. a preview URL). When it lands
    on the SSO page, log in yourself in the browser window it opened, then tell
    the agent to continue.
-3. The SSO session is stored in the profile. Later sessions — and other
+3. **Headless first pass, visible window to investigate.** You can also start
+   headless (`PLAYWRIGHT_MCP_HEADLESS=true`): the agent runs fast and invisibly,
+   and calls `set_browser_mode` to open a visible window when it needs you to
+   log in, or to reproduce a failure where you can watch. The profile keeps the
+   login across the switch.
+4. The SSO session is stored in the profile. Later sessions — and other
    preview environments behind the same identity provider — usually go straight
    through without logging in again, until your company's SSO session expires.
 

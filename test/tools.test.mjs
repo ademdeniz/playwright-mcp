@@ -46,7 +46,7 @@ test('lists every tool', async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map(t => t.name).sort(), [
     'assert', 'click', 'close_browser', 'evaluate', 'fill', 'get_page_state',
-    'navigate', 'press_key', 'screenshot', 'select_option', 'set_viewport', 'wait_for',
+    'navigate', 'press_key', 'screenshot', 'select_option', 'set_browser_mode', 'set_viewport', 'wait_for',
   ]);
 });
 
@@ -206,6 +206,42 @@ test('self-signed HTTPS is rejected by default and accepted when allowed', async
     }
   } finally {
     secure.close();
+  }
+});
+
+test('set_browser_mode validates input and keeps the page when the mode is unchanged', async () => {
+  await call('navigate', { url: `${site.base}/login` });
+  const same = await call('set_browser_mode', { headless: true });
+  assert.equal(same.json.headless, true);
+  assert.equal(same.json.changed, false);
+  assert.match((await call('get_page_state')).json.url, /\/login$/);
+  const bad = await call('set_browser_mode', {});
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /"headless"/);
+});
+
+test('a login made headless survives switching to a visible window and back', async (t) => {
+  if (process.platform === 'linux' && !process.env.DISPLAY) return t.skip('no display for a visible browser');
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'pmcp-mode-'));
+  const c = await connect({ PLAYWRIGHT_MCP_USER_DATA_DIR: profile, PLAYWRIGHT_MCP_HEADLESS: 'true' });
+  try {
+    await call('navigate', { url: `${site.base}/login` }, c);
+    await call('evaluate', { expression: "document.cookie = 'sso_session=xyz789; max-age=3600; path=/'" }, c);
+
+    const visible = await call('set_browser_mode', { headless: false }, c);
+    assert.equal(visible.json.headless, false);
+    assert.equal(visible.json.changed, true);
+    assert.equal(visible.json.persistentProfile, true);
+    assert.match(visible.json.reopened, /\/login$/, visible.text);
+    assert.match((await call('evaluate', { expression: 'document.cookie' }, c)).json.result, /sso_session=xyz789/);
+
+    const back = await call('set_browser_mode', { headless: true }, c);
+    assert.equal(back.json.headless, true);
+    assert.match((await call('evaluate', { expression: 'document.cookie' }, c)).json.result, /sso_session=xyz789/);
+  } finally {
+    await call('close_browser', {}, c).catch(() => {});
+    await c.close();
+    fs.rmSync(profile, { recursive: true, force: true });
   }
 });
 
